@@ -1,0 +1,42 @@
+<html>
+    <head>
+        <title>How to use ImageTagger</title>
+        <style type="text/css">
+        body
+        {
+            font-family: sans-serif;
+        }
+        </style>
+    </head>
+    <body>
+        <h3>How to use ImageTagger</h3>
+
+        To tag a region, first ensure you have entered a tag name.<br>
+        Hover the cursor above the starting point in the image, then right-click and drag the cursor to the end point. Release the right mouse button.<br>
+        To delete a tag, left-click on it, then press <b>[Del]</b> on your keyboard.
+
+        <h4>Further information</h4>
+
+        ImageTagger is a useful tool for tagging regions of images, for example in order to create training sets for deep learning.<br>
+        It produces <b>.taglist.json</b> files, which contain the tag names as well as the coordinates of the image's tags.
+        A <b>.taglist.json</b> file looks like this:
+        <br><br>
+        <pre>{
+    "note": "This file is auto-generated. Modifying its structure will cause the image tagger to stop working.",
+    "fileFormatVersion": 1.0,
+    "minFileFormatVersion": 1.0,
+    "tags":
+    [
+        ["tag1", tag1X, tag1Y, tag1Width, tag1Height],
+        ["tag2", 60, 534, 459, 385],
+        ...
+        ["tagN", tagNX, tagNY, tagNWidth, tagNHeight]
+    ]
+}</pre>
+        <br><br>
+        The files are stored in the same directory as the input images, and will have the same name, with <b>&quot;.taglist.json&quot;</b> appended to it.<br>
+        For example, &quot;image.jpg&quot; yields &quot;image.jpg.taglist.json&quot;.
+        <br><br>
+        To begin tagging, simply set a working directory, which should contain the images you want to tag.
+    </body>
+</html>
