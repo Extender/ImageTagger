@@ -6,6 +6,10 @@ Should you want to create a polygonal tag, check the "Polygonal tagging" radio b
 Specify the edges of the polygon using by clicking with the right mouse button, then click anywhere in the image with the left mouse button to close the polygon.<br><br>
 To delete a tag, left-click on it, then press __[Del]__ on your keyboard.
 
+### Screenshot
+
+![Screenshot of ImageTagger](Screenshot.png)
+
 #### Further information
 
 ImageTagger is a useful tool for tagging regions of images, for example in order to create training sets for deep learning.<br>
@@ -15,8 +19,8 @@ A __.taglist.json__ file looks like this:
 <pre>
 {
     "note": "This file is auto-generated. Modifying its structure will cause the image tagger to stop working.",
-    "fileFormatVersion": %version%,
-    "minFileFormatVersion": %minversion%,
+    "fileFormatVersion": 1.1,
+    "minFileFormatVersion": 1.1,
     "tagCount": 4,
     "tags":
     [
