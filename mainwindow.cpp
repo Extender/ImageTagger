@@ -7,7 +7,9 @@ MainWindow::MainWindow(QString workingDirectory, QWidget *parent) :
     MainWindowEx(parent),
     ui(new Ui::MainWindow)
 {
-    instance=this;
+    srand(time(0));
+
+    MainWindow::instance=this;
     currentVersionStr=QString::number(CURRENT_VERSION,'f',1);
     minVersionStr=QString::number(MIN_VERSION,'f',1);
 
@@ -33,9 +35,9 @@ MainWindow::MainWindow(QString workingDirectory, QWidget *parent) :
     else
         tagColor=QColor(DEFAULT_TAG_COLOR);
 
-    srand(time(0));
     ui->setupUi(this);
     setWindowTitle(windowTitle()+" v"+currentVersionStr);
+    ui->rectangularTaggingBtn->setChecked(true);
 
     // Keep this block here
     {
@@ -45,7 +47,10 @@ MainWindow::MainWindow(QString workingDirectory, QWidget *parent) :
         ui->itemGraphicsView->setScene(scene);
         ui->itemGraphicsView->getCurrentTagStringFunction=&MainWindow::currentTagString;
         ui->itemGraphicsView->getCurrentTagColorFunction=&MainWindow::currentTagColor;
+        ui->itemGraphicsView->getIsPolygonalSelectionFunction=&MainWindow::isPolygonalSelection;
+        ui->itemGraphicsView->getIsRectangularSelectionFunction=&MainWindow::isRectangularSelection;
         connect(ui->itemGraphicsView,SIGNAL(rectItemAdded(QGraphicsRectItem*)),this,SLOT(itemGraphicsViewRectItemAdded(QGraphicsRectItem*)));
+        connect(ui->itemGraphicsView,SIGNAL(pathItemAdded(QGraphicsPathItem*)),this,SLOT(itemGraphicsViewPathItemAdded(QGraphicsPathItem*)));
     }
 
     items=new vector<item_t>();
@@ -154,6 +159,7 @@ void MainWindow::removeAllItemsFromSceneExceptPixmapItem()
         scene->removeItem(item);
         delete item;
     }
+    ui->itemGraphicsView->selectedItem=0;
 }
 
 QString MainWindow::currentTagString()
@@ -166,6 +172,16 @@ QColor MainWindow::currentTagColor()
     return instance->tagColor;
 }
 
+bool MainWindow::isRectangularSelection()
+{
+    return instance->ui->rectangularTaggingBtn->isChecked();
+}
+
+bool MainWindow::isPolygonalSelection()
+{
+    return !instance->isRectangularSelection();
+}
+
 QString MainWindow::reverseString(QString in)
 {
     size_t l=in.length();
@@ -174,6 +190,13 @@ QString MainWindow::reverseString(QString in)
     for(size_t r=l-1;r>=0;r--)
         out[i++]=in[r];
     return out;
+}
+
+void MainWindow::trimAllStrings(QStringList &list)
+{
+    size_t s=list.count();
+    for(size_t i=0;i<s;i++)
+        list[i]=list[i].trimmed();
 }
 
 bool MainWindow::getColorFromHexString(const char *str, uint32_t &color)
@@ -346,6 +369,8 @@ void MainWindow::setWorkingDirectoryBtnClicked()
             item_t item=new new_item_t(itemName,new QImage(QImage::fromData((uchar*)data,s,extStr)),extension);
             free(extStr);
             // item->tags already initialized during construction
+            bool firstVersion=false;
+            float fileFormatVersion=0.0f;
             for(QString _str:tagSpl)
             {
                 QString str=_str.trimmed();
@@ -363,6 +388,14 @@ void MainWindow::setWorkingDirectoryBtnClicked()
                         goto Skip;
                     }
                 }
+                if(str.startsWith("\"fileFormatVersion\""))
+                {
+                    int i2=str.lastIndexOf(':');
+                    QString rem=str.mid(i2+1).trimmed();
+                    fileFormatVersion=rem.toFloat();
+                    if(fileFormatVersion==1.0f)
+                        firstVersion=true;
+                }
                 if(str.startsWith('[')&&str.endsWith(']'))
                 {
                     // This is a tag.
@@ -372,18 +405,64 @@ void MainWindow::setWorkingDirectoryBtnClicked()
                     str.remove(str.length()-1,1);
 
                     int i=str.indexOf('"');
-                    int i2=str.lastIndexOf('"');
 
-                    if(i==-1||i2==-1)
+                    if(i!=0) // Must be first character ("str" trimmed above)!
                         continue;
 
-                    QString name=str.mid(i+1,i2-i-1);
-                    QString rem=str.mid(i2+1);
+                    char *nameStr=text::unescapeDoubleQuotationMarksUntilEnd(str.toStdString().c_str());
 
-                    char *nameStr=strdup(name.toStdString().c_str());
-                    QStringList spl2=rem.split(", ",QString::SkipEmptyParts);
-                    QRectF rect(spl2.at(0).toFloat(),spl2.at(1).toFloat(),spl2.at(2).toFloat(),spl2.at(3).toFloat());
-                    item->tags->push_back(new pair<char*,QRectF>(nameStr,rect));
+                    QString rem=str.mid(str.lastIndexOf('"')+1).remove(' ').remove('\t');
+
+                    QStringList spl2=rem.split(",",QString::SkipEmptyParts);
+                    trimAllStrings(spl2);
+                    bool isRect=spl2.count()==4||spl2.contains("\"rect\"",Qt::CaseInsensitive)||spl2.contains("\"rectangle\"",Qt::CaseInsensitive)||spl2.contains("true",Qt::CaseInsensitive);
+                    if(isRect)
+                    {
+                        double rectX=spl2.at(0).toDouble();
+                        double rectY=spl2.at(1).toDouble();
+                        double rectWidth=spl2.at(2).toDouble()-(firstVersion?0:rectX); // First version stores width directly
+                        double rectHeight=spl2.at(3).toDouble()-(firstVersion?0:rectY); // First version stores height directly
+                        QRectF rect(rectX,rectY,rectWidth,rectHeight);
+                        item->tags->push_back(new pair<char*,TagPath>(nameStr,TagPath(rect)));
+                    }
+                    else
+                    {
+                        QPainterPath path=QPainterPath();
+                        bool started=false;
+                        QString x="";
+                        for(QString _part : spl2)
+                        {
+                            QString part=_part.remove(' ').remove('\t');
+                            if(part.contains('"'))
+                                continue;
+                            if(_part.startsWith('['))
+                            {
+                                x=_part.mid(1);
+                            }
+                            else if(_part.endsWith(']'))
+                            {
+                                bool ok=false;
+                                bool success=true;
+                                double _x=x.toDouble(&ok);
+                                if(!ok)
+                                    success=false;
+                                double _y=_part.mid(0,_part.length()-1).toDouble(&ok);
+                                if(!ok)
+                                    success=false;
+                                if(!success)
+                                    continue;
+                                if(!started)
+                                {
+                                    path.moveTo(_x,_y);
+                                    started=true;
+                                }
+                                else
+                                    path.lineTo(_x,_y);
+                            }
+                        }
+                        path.closeSubpath();
+                        item->tags->push_back(new pair<char*,TagPath>(nameStr,TagPath(path)));
+                    }
                 }
             }
             // Keep this here; the file may get skipped
@@ -471,9 +550,18 @@ void MainWindow::selectItem(int index)
     size_t s=selectedItem->tags->size();
     for(size_t i=0;i<s;i++)
     {
-        pair<char*,QRectF> *p=selectedItem->tags->at(i);
-        QGraphicsRectItem *rectItem=ui->itemGraphicsView->addItem(p->second,QString(p->first));
-        rectItem->setData(Qt::UserRole+1,QVariant((qulonglong)p));
+        pair<char*,TagPath> *p=selectedItem->tags->at(i);
+        if(p->second.isRect)
+        {
+            QGraphicsRectItem *rectItem=ui->itemGraphicsView->addItem(p->second.rect,QString(p->first));
+            rectItem->setData(Qt::UserRole+1,QVariant((qulonglong)p));
+        }
+        else
+        {
+            TagPath tagPath=p->second;
+            QGraphicsPathItem *pathItem=ui->itemGraphicsView->addItem(tagPath.path,QString(p->first));
+            pathItem->setData(Qt::UserRole+1,QVariant((qulonglong)p));
+        }
     }
 }
 
@@ -604,15 +692,37 @@ void MainWindow::saveCurrentItem()
 void MainWindow::saveCurrentTags()
 {
     QString path=workingDir+selectedItem->name+"."+selectedItem->extension+".taglist.json";
-    QString tagStr="{\n\t\"note\": \"This file is auto-generated. Modifying its structure will cause ImageTagger to stop working.\",\n\t\"fileFormatVersion\": "+currentVersionStr+",\n\t\"minFileFormatVersion\": "+minVersionStr+",\n\t\"tags\":\n\t[";
     size_t tc=selectedItem->tags->count();
+    QString tagStr="{\n\t\"note\": \"This file is auto-generated. Modifying its structure will cause ImageTagger to stop working.\",\n\t\"fileFormatVersion\": "+currentVersionStr+",\n\t\"minFileFormatVersion\": "+minVersionStr+",\n\t\"tagCount\": "+QString::number(tc)+",\n\t\"tags\":\n\t[";
     for(size_t i=0;i<tc;i++)
     {
-        pair<char*,QRectF> *tag=selectedItem->tags->at(i);
-        QRectF r=tag->second;
-        char *escStr=text::escapeDoubleQuotationMarks(tag->first);
-        tagStr+=QString(i>0?",":"")+"\n\t\t[\""+escStr+"\", "+num((float)r.x())+", "+num((float)r.y())+", "+num((float)r.width())+", "+num((float)r.height())+"]";
-        free(escStr);
+        pair<char*,TagPath> *tag=selectedItem->tags->at(i);
+        TagPath p=tag->second;
+        if(p.isRect)
+        {
+            QRectF e=p.rect;
+            char *escStr=text::escapeDoubleQuotationMarks(tag->first);
+            tagStr+=QString(i>0?",":"")+"\n\t\t[\""+escStr+"\", \"rect\", "+num((float)e.x())+", "+num((float)e.y())+", "+num((float)e.right())+", "+num((float)e.bottom())+"]";
+            free(escStr);
+        }
+        else
+        {
+            QPainterPath e=p.path;
+            char *escStr=text::escapeDoubleQuotationMarks(tag->first);
+            tagStr+=QString(i>0?",":"")+"\n\t\t[\""+escStr+"\", \"polygon\"";
+            int count=e.elementCount();
+            for(int j=0;j<count;j++)
+            {
+                QPainterPath::Element elem=e.elementAt(j);
+                tagStr+=", [";
+                tagStr+=QString::number(elem.x);
+                tagStr+=", ";
+                tagStr+=QString::number(elem.y);
+                tagStr+="]";
+            }
+            tagStr+="]";
+            free(escStr);
+        }
     }
 
     tagStr+="\n\t]\n}";
@@ -671,30 +781,34 @@ void MainWindow::keyDownHandler(QKeyEvent *event)
             return;
 
         QGraphicsSimpleTextItem *textItem;
-        QGraphicsRectItem *rectItem;
+        QGraphicsItem *assocItem;
 
         int itemType=item->type();
         if(itemType==9 /*QGraphicsSimpleTextItem::type()*/)
         {
             textItem=(QGraphicsSimpleTextItem*)item;
-            rectItem=(QGraphicsRectItem*)item->data(Qt::UserRole).toULongLong();
+            assocItem=(QGraphicsItem*)item->data(Qt::UserRole).toULongLong();
         }
-        else if(itemType==3 /*QGraphicsRectItem::type()*/)
+        else if(itemType==2 /*QGraphicsPathItem::type()*/ || itemType==3 /*QGraphicsRectItem::type()*/)
         {
             textItem=(QGraphicsSimpleTextItem*)item->data(Qt::UserRole).toULongLong();
-            rectItem=(QGraphicsRectItem*)item;
+            assocItem=(QGraphicsItem*)item;
         }
         else
             return;
 
-        selectedItem->tags->removeOne((std::pair<char*,QRectF>*)rectItem->data(Qt::UserRole+1).toULongLong()); // Do not use removeAt, as the indexes may shift
+        std::pair<char*,TagPath> *p=(std::pair<char*,TagPath>*)assocItem->data(Qt::UserRole+1).toULongLong();
+        selectedItem->tags->removeOne(p); // Do not use removeAt, as the indexes may shift
+        free(p->first);
+        delete p;
 
         scene->removeItem(textItem);
-        scene->removeItem(rectItem);
+        scene->removeItem(assocItem);
 
         delete textItem;
-        delete rectItem;
+        delete assocItem;
 
+        ui->itemGraphicsView->selectedItem=0;
         saveCurrentTags();
     }
 }
@@ -702,9 +816,19 @@ void MainWindow::keyDownHandler(QKeyEvent *event)
 void MainWindow::itemGraphicsViewRectItemAdded(QGraphicsRectItem *rectItem)
 {
     char *tag=strdup(ui->tagBox->text().toStdString().c_str());
-    std::pair<char*,QRectF> *p=new std::pair<char*,QRectF>(tag,rectItem->rect());
+    std::pair<char*,TagPath> *p=new std::pair<char*,TagPath>(tag,TagPath(rectItem->rect()));
     selectedItem->tags->push_back(p);
     rectItem->setData(Qt::UserRole+1,QVariant((qulonglong)p));
+    saveCurrentTags();
+    // Do not free "tag"
+}
+
+void MainWindow::itemGraphicsViewPathItemAdded(QGraphicsPathItem *pathItem)
+{
+    char *tag=strdup(ui->tagBox->text().toStdString().c_str());
+    std::pair<char*,TagPath> *p=new std::pair<char*,TagPath>(tag,TagPath(pathItem->path()));
+    selectedItem->tags->push_back(p);
+    pathItem->setData(Qt::UserRole+1,QVariant((qulonglong)p));
     saveCurrentTags();
     // Do not free "tag"
 }
@@ -721,7 +845,7 @@ void MainWindow::linkActivated(QString target)
             QTextStream st(&ba);
             QString source=st.readAll();
             sourceFile.close();
-            howToUseDialog=new WebBrowserDialog("How to use ImageTagger",source.replace("%version%",currentVersionStr),this);
+            howToUseDialog=new WebBrowserDialog("How to use ImageTagger",source.replace("%version%",currentVersionStr).replace("%minversion%",minVersionStr),this);
         }
         howToUseDialog->show();
         howToUseDialog->activateWindow();
@@ -736,7 +860,7 @@ void MainWindow::linkActivated(QString target)
             QTextStream st(&ba);
             QString source=st.readAll();
             sourceFile.close();
-            aboutDialog=new WebBrowserDialog("About ImageTagger",source.replace("%version%",currentVersionStr),this);
+            aboutDialog=new WebBrowserDialog("About ImageTagger",source.replace("%version%",currentVersionStr).replace("%minversion%",minVersionStr),this);
         }
         aboutDialog->show();
         aboutDialog->activateWindow();

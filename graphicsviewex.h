@@ -5,10 +5,12 @@
 #include <QWheelEvent>
 #include <QGraphicsItem>
 #include <QGraphicsRectItem>
-#include <QDebug>
+#include <QGraphicsPathItem>
 #include <QScrollBar>
 
 #include "graphicssceneex.h"
+
+#define QVARIANT_PEN_BACKUP_ID 100
 
 class GraphicsViewEx : public QGraphicsView
 {
@@ -24,9 +26,13 @@ public:
     QGraphicsRectItem *newRectItem;
     QGraphicsItem *selectedItem;
     QString tagToUse;
+    QGraphicsPathItem *newPathItem;
+    QPainterPath *painterPath;
 
     QString (*getCurrentTagStringFunction)(void);
     QColor (*getCurrentTagColorFunction)(void);
+    bool (*getIsRectangularSelectionFunction)(void);
+    bool (*getIsPolygonalSelectionFunction)(void);
 
 
     GraphicsViewEx(QWidget *parent);
@@ -42,6 +48,11 @@ public:
     void setZoomFactor(double newZoomFactor);
     void resetZoom();
     QGraphicsRectItem *addItem(QRectF rect,QString tag);
+    QGraphicsPathItem *addItem(QPainterPath path,QString tag);
+
+public slots:
+    void highlightItem(QGraphicsItem *item);
+    void unhighlightItem(QGraphicsItem *item);
 
 signals:
     void wheelEx(QWheelEvent *e);
@@ -53,6 +64,7 @@ signals:
     void mouseDoubleClickEx(QMouseEvent *e);
     void dropEx(QDropEvent *e);
     void rectItemAdded(QGraphicsRectItem *rectItem);
+    void pathItemAdded(QGraphicsPathItem *pathItem);
     void selectedItemChanged(QGraphicsItem *item);
 };
 

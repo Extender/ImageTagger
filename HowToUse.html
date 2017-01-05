@@ -11,8 +11,10 @@
     <body>
         <h3>How to use ImageTagger</h3>
 
-        To tag a region, first ensure you have entered a tag name.<br>
-        Hover the cursor above the starting point in the image, then right-click and drag the cursor to the end point. Release the right mouse button.<br>
+        ImageTagger supports rectangular and also much more precise polygonal tagging. Before tagging a region, first ensure you have entered a tag name.<br><br>
+        To create a rectangular tag, make sure the &quot;Rectangular tagging&quot; radio button is checked. Hover the cursor above the starting point in the image, then right-click and drag the cursor to the end point. Release the right mouse button.<br><br>
+        Should you want to create a polygonal tag, check the &quot;Polygonal tagging&quot; radio button, then use the right mouse button to begin a polygon.<br>
+        Specify the edges of the polygon using by clicking with the right mouse button, then click anywhere in the image with the left mouse button to close the polygon.<br><br>
         To delete a tag, left-click on it, then press <b>[Del]</b> on your keyboard.
 
         <h4>Further information</h4>
@@ -20,20 +22,22 @@
         ImageTagger is a useful tool for tagging regions of images, for example in order to create training sets for deep learning.<br>
         It produces <b>.taglist.json</b> files, which contain the tag names as well as the coordinates of the image's tags.
         A <b>.taglist.json</b> file looks like this:
-        <br><br>
+
         <pre>{
     "note": "This file is auto-generated. Modifying its structure will cause the image tagger to stop working.",
-    "fileFormatVersion": 1.0,
-    "minFileFormatVersion": 1.0,
+    "fileFormatVersion": %version%,
+    "minFileFormatVersion": %minversion%,
+    "tagCount": 4,
     "tags":
     [
-        ["tag1", tag1X, tag1Y, tag1Width, tag1Height],
-        ["tag2", 60, 534, 459, 385],
+        ["tagName1", "rect", tag1LeftX, tag1TopY, tag1RightX, tag1BottomY],
+        ["tagName2", "rect", 60, 534, 459, 385],
+        ["tagName3", "polygon", [tag3Point1X, tag3Point1Y], [tag3Point2X, tag3Point2Y], [tag3Point3X, tag3Point3Y], ...],
+        ["tagName4", "polygon", [235, 403], [259, 455], [322, 487], [289, 290]],
         ...
-        ["tagN", tagNX, tagNY, tagNWidth, tagNHeight]
     ]
 }</pre>
-        <br><br>
+
         The files are stored in the same directory as the input images, and will have the same name, with <b>&quot;.taglist.json&quot;</b> appended to it.<br>
         For example, &quot;image.jpg&quot; yields &quot;image.jpg.taglist.json&quot;.
         <br><br>

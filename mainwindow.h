@@ -26,8 +26,8 @@
 // WARNING: Must have exactly one decimal place!
 // The format "1.11" is illegal!
 
-#define CURRENT_VERSION 1.0f
-#define MIN_VERSION 1.0f
+#define CURRENT_VERSION 1.1f
+#define MIN_VERSION 1.1f
 
 #define num(n) (QString::number((n)))
 
@@ -40,18 +40,38 @@ class MainWindow;
 class GraphicsSceneEx;
 class GraphicsViewEx;
 
+class TagPath
+{
+public:
+    bool isRect;
+    QRectF rect;
+    QPainterPath path;
+
+    TagPath(QRectF _rect)
+    {
+        isRect=true;
+        rect=QRectF(_rect.topLeft(),_rect.size()); // Do not use QRectF(_rect)! No copy constructor available!
+    }
+
+    TagPath(QPainterPath _path)
+    {
+        isRect=false;
+        path=_path.toReversed().toReversed(); // Do not use QPainterPath(_path)! No copy constructor available!
+    }
+};
+
 class ItemClass
 {
 public:
     QString name;
-    QList<pair<char*,QRectF>*> *tags;
+    QList<pair<char*,TagPath>*> *tags;
     QImage *image;
     QString extension;
 
     ItemClass()
     {
         name="";
-        tags=new QList<pair<char*,QRectF>*>();
+        tags=new QList<pair<char*,TagPath>*>();
         image=0;
         extension="";
     }
@@ -59,7 +79,7 @@ public:
     ItemClass(QString _name)
     {
         name=_name;
-        tags=new QList<pair<char*,QRectF>*>();
+        tags=new QList<pair<char*,TagPath>*>();
         image=0;
         extension="";
     }
@@ -67,7 +87,7 @@ public:
     ItemClass(QString _name,QString _extension)
     {
         name=_name;
-        tags=new QList<pair<char*,QRectF>*>();
+        tags=new QList<pair<char*,TagPath>*>();
         image=0;
         extension=_extension;
     }
@@ -75,7 +95,7 @@ public:
     ItemClass(QString _name,QImage *_image)
     {
         name=_name;
-        tags=new QList<pair<char*,QRectF>*>();
+        tags=new QList<pair<char*,TagPath>*>();
         image=_image;
         extension="";
     }
@@ -83,7 +103,7 @@ public:
     ItemClass(QString _name,QImage *_image,QString _extension)
     {
         name=_name;
-        tags=new QList<pair<char*,QRectF>*>();
+        tags=new QList<pair<char*,TagPath>*>();
         image=_image;
         extension=_extension;
     }
@@ -135,7 +155,10 @@ public:
 
     static QString currentTagString();
     static QColor currentTagColor();
+    static bool isRectangularSelection();
+    static bool isPolygonalSelection();
     static QString reverseString(QString in);
+    static void trimAllStrings(QStringList &list);
     static bool getColorFromHexString(const char *str, uint32_t &color);
 
 public slots:
@@ -156,7 +179,8 @@ public slots:
     void addNewItem(QString name,QImage *image);
     void filterItems(QString wildcard);
     void keyDownHandler(QKeyEvent *event);
-    void itemGraphicsViewRectItemAdded(QGraphicsRectItem*);
+    void itemGraphicsViewRectItemAdded(QGraphicsRectItem *rectItem);
+    void itemGraphicsViewPathItemAdded(QGraphicsPathItem *pathItem);
     void linkActivated(QString target);
 
 private:
