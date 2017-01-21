@@ -56,6 +56,18 @@ void GraphicsViewEx::leaveEvent(QEvent *e)
     if(newItem)
     {
         toggleNewItem();
+        posMap->clear();
+        // Needed:
+        if(newRectItem!=0)
+        {
+            delete newRectItem;
+            newRectItem=0;
+        }
+        if(newPathItem!=0)
+        {
+            delete newPathItem;
+            newPathItem=0;
+        }
     }
     mouseLeaveEx(e);
 }
