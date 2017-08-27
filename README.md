@@ -6,6 +6,10 @@ Should you want to create a polygonal tag, check the "Polygonal tagging" radio b
 Specify the edges of the polygon using by clicking with the right mouse button, then click anywhere in the image with the left mouse button to close the polygon.<br><br>
 To delete a tag, left-click on it, then press __[Del]__ on your keyboard.
 
+### Download
+
+Download link: [Win32 binary](https://github.com/Extender/ImageTagger/raw/master/bin/imagetagger-v1.1-bin-win32.zip)
+
 ### Screenshot
 
 ![Screenshot of ImageTagger](Screenshot.png)
